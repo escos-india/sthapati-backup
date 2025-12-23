@@ -1,0 +1,109 @@
+// Type-only definitions for User - safe to import in client components
+// This file should NEVER import Mongoose or any Node.js-only modules
+
+import type { UserCategory, UserStatus } from '@/lib/constants';
+
+export interface IUser {
+  _id?: string;
+  name: string;
+  email: string;
+  googleId?: string | null;
+  password?: string | null;
+  phone?: string | null;
+  image?: string | null;
+  category: UserCategory;
+  status: UserStatus;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+
+  // Profile Fields
+  isProfileComplete?: boolean; // Added
+  cover_image?: string | null;
+  headline?: string | null;
+  location?: {
+    city?: string;
+    state?: string;
+    country?: string;
+    address?: string; // Added
+  };
+  work_preference?: 'Remote' | 'Hybrid' | 'Onsite' | 'Not Open';
+  bio?: string | null;
+
+  services?: {
+    title: string;
+    description: string;
+    tags: string[];
+  }[];
+
+  experience?: {
+    _id?: string;
+    title: string;
+    organization: string;
+    type: string;
+    start_date: Date | string;
+    end_date?: Date | string;
+    is_current: boolean;
+    description: string;
+    media?: string[];
+  }[];
+
+  education?: {
+    _id?: string;
+    institution: string;
+    degree: string;
+    field_of_study: string;
+    start_date: Date | string;
+    end_date?: Date | string;
+  }[];
+
+  skills?: {
+    _id?: string;
+    name: string;
+    proficiency?: string;
+    endorsements?: number;
+  }[];
+
+  projects?: {
+    _id?: string;
+    title: string;
+    description: string;
+    role: string;
+    location?: string;
+    year?: string | number;
+    budget_range?: string;
+    tags?: string[];
+    tools?: string[]; // Keeping for legacy/optional
+    media: { url: string; type: 'image' | 'video' }[]; // Updated structure
+  }[];
+
+  certifications?: {
+    _id?: string;
+    title: string;
+    issuer: string;
+    issue_date: Date | string;
+    credential_url?: string;
+  }[];
+
+  gallery?: {
+    _id?: string;
+    title?: string;
+    url: string;
+    type: 'image' | 'video';
+  }[];
+
+  social_links?: {
+    website?: string;
+    linkedin?: string;
+    twitter?: string;
+    instagram?: string;
+    github?: string;
+  };
+
+  verification_badges?: {
+    email: boolean;
+    organization: boolean;
+    skill: boolean;
+  };
+}
+
+export type { UserCategory, UserStatus };
