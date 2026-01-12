@@ -579,7 +579,7 @@ export function DashboardFeed({ user, readOnly = false }: DashboardFeedProps) {
                     </div>
 
                     {/* Delete/Edit Options - Only for Owner or Admin */}
-                    {!readOnly && (user._id === post.author._id || user.isAdmin || user.category === 'Admin') && (
+                    {!readOnly && (user._id === post.author._id || user.isAdmin) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800">
