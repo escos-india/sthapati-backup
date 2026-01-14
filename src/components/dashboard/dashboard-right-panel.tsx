@@ -469,7 +469,7 @@ export function DashboardRightPanel({ user, readOnly = false }: DashboardRightPa
                           name="salary_range"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Salary Range (in K)</FormLabel>
+                              <FormLabel>Salary Range (in )</FormLabel>
                               <FormControl>
                                 <Input required placeholder="e.g. $50k - $80k" {...field} />
                               </FormControl>
@@ -528,7 +528,7 @@ export function DashboardRightPanel({ user, readOnly = false }: DashboardRightPa
                   </div>
 
                   {/* Delete Button for Job Owner */}
-                  {!isJobSeeker && (
+                  {!isJobSeeker && !readOnly && (
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"

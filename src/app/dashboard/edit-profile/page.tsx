@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2 } from "lucide-react";
+import { COA_REGEX } from "@/lib/constants";
 
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileInfo } from "@/components/profile/profile-info";
@@ -54,6 +55,7 @@ interface EditProfileFormState {
     specialization?: string;
     resume?: string;
     materials?: any[];
+    coa_number?: string;
 }
 
 export default function EditProfilePage() {

@@ -63,6 +63,11 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        if (user.category === 'Architect' && user.status === 'pending') {
+          console.log(`[Auth] Pending architect login blocked: ${identifier}`);
+          throw new Error("ProfileUnderReview");
+        }
+
         // Strict Admin Check for Admin Login Form
         const loginType = (credentials as any)?.loginType;
         if (loginType === 'admin') {

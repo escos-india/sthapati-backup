@@ -26,9 +26,9 @@ export async function GET(req: Request) {
             return NextResponse.json([]);
         }
 
-        // If user is guest, do NOT return items
+        // If user is guest, allow them to see active announcements (no dismissal filtering needed yet)
         if (!session?.user?.email) {
-            return NextResponse.json([]);
+            return NextResponse.json(activeAnnouncements);
         }
 
         // If user is logged in, filter out dismissed

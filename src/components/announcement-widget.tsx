@@ -27,11 +27,12 @@ export function AnnouncementWidget() {
 
     useEffect(() => {
         if (status === 'loading') return;
-        if (!session?.user) {
+        // If no session, we still fetch (guest mode)
+        /* if (!session?.user) {
             setAnnouncement(null);
             setIsVisible(false);
             return;
-        }
+        } */
 
         const fetchAnnouncement = async () => {
             try {
@@ -57,9 +58,9 @@ export function AnnouncementWidget() {
     }, [session, status]);
 
     const handleDismiss = async () => {
-        if (!announcement || !session?.user) return;
+        setIsVisible(false); // Allow local dismiss for everyone
 
-        setIsVisible(false);
+        if (!announcement || !session?.user) return; // Don't call API if guest
 
         try {
             await fetch('/api/announcements/dismiss', {

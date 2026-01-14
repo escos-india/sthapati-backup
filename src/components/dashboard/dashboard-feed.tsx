@@ -317,7 +317,7 @@ export function DashboardFeed({ user, readOnly = false }: DashboardFeedProps) {
                     id="open-work"
                     checked={openToWork}
                     onCheckedChange={handleStatusUpdate}
-                    disabled={isUpdatingStatus}
+                    disabled={isUpdatingStatus || readOnly}
                   />
                 </div>
               </div>

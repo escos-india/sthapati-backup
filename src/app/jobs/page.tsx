@@ -37,7 +37,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { CldUploadWidget } from 'next-cloudinary';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/ui/logo';
@@ -78,6 +77,24 @@ type Talent = {
   isOpenToWork?: boolean;
   email?: string;
   phone?: string;
+};
+
+type Application = {
+  _id: string;
+  job: string;
+  applicant: {
+    _id: string;
+    name: string;
+    image?: string;
+    email?: string;
+    headline?: string;
+    category?: string;
+    phone?: string;
+  };
+  resume: string;
+  coverLetter?: string;
+  status: 'pending' | 'reviewed' | 'shortlisted' | 'rejected' | 'accepted';
+  createdAt: string;
 };
 
 const JOB_POSTERS = ['Architect', 'Contractor', 'Builder', 'Agency', 'Material Supplier'];
@@ -397,6 +414,10 @@ export default function JobsPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [userCategory, setUserCategory] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
+  const [showApplicationsDialog, setShowApplicationsDialog] = useState(false);
 
   // Fetch Initial Data
   useEffect(() => {
@@ -420,6 +441,7 @@ export default function JobsPage() {
             if (profileRes.ok) {
               const profile = await profileRes.json();
               setUserCategory(profile.category || '');
+              setUserId(profile._id || null);
               if (profile.resume) {
                 setApplicationData(prev => ({ ...prev, resume: profile.resume }));
               }
@@ -514,6 +536,24 @@ export default function JobsPage() {
     }
   }
 
+  // Fetch applications for a job (only for job poster)
+  const fetchApplications = async (jobId: string) => {
+    setLoadingApplications(true);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/applications`);
+      if (res.ok) {
+        const data = await res.json();
+        setApplications(data);
+      } else {
+        setApplications([]);
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      setApplications([]);
+    } finally {
+      setLoadingApplications(false);
+    }
+  };
 
 
   // Derived State for Filtering
@@ -783,69 +823,232 @@ export default function JobsPage() {
                         </CardContent>
 
                         <div className="p-4 border-t bg-background flex gap-4 sticky bottom-0 z-10">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button className="flex-1" size="lg">Apply</Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-md">
-                              <DialogHeader>
-                                <div className="flex items-center gap-4 mb-4">
-                                  <div className="h-16 w-16 rounded-full overflow-hidden border">
-                                    {selectedJob.posted_by?.image ? (
-                                      <Image src={selectedJob.posted_by.image} alt={selectedJob.posted_by.name} width={64} height={64} className="object-cover h-full w-full" />
+                          {/* Apply Button - for candidates */}
+                          {session?.user && selectedJob.posted_by?._id !== userId && (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button className="flex-1" size="lg">
+                                  <FileText className="h-4 w-4 mr-2" /> Apply Now
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-lg">
+                                <DialogHeader>
+                                  <DialogTitle>Apply for {selectedJob.title}</DialogTitle>
+                                  <DialogDescription>
+                                    Submit your application to {selectedJob.company}
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-6 mt-4">
+                                  {/* Resume Upload */}
+                                  <div className="space-y-2">
+                                    <Label>Resume (PDF) *</Label>
+                                    {applicationData.resume ? (
+                                      <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                        <CheckCircle className="h-5 w-5 text-green-600" />
+                                        <span className="flex-1 text-sm truncate">Resume uploaded</span>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => setApplicationData(prev => ({ ...prev, resume: '' }))}
+                                        >
+                                          Change
+                                        </Button>
+                                        <Button variant="outline" size="sm" asChild>
+                                          <Link href={applicationData.resume} target="_blank">
+                                            View
+                                          </Link>
+                                        </Button>
+                                      </div>
                                     ) : (
-                                      <div className="h-full w-full bg-secondary flex items-center justify-center">
-                                        <User className="h-8 w-8 text-muted-foreground" />
+                                      <div className="relative">
+                                        <div className="flex flex-col gap-2">
+                                          <Input
+                                            id="resume-upload"
+                                            type="file"
+                                            accept=".pdf"
+                                            className="hidden"
+                                            onChange={async (e) => {
+                                              const file = e.target.files?.[0];
+                                              if (!file) return;
+
+                                              if (file.type !== "application/pdf") {
+                                                toast({ title: "Invalid File", description: "Please upload a PDF file", variant: "destructive" });
+                                                return;
+                                              }
+
+                                              if (file.size > 5 * 1024 * 1024) {
+                                                toast({ title: "File too large", description: "File size must be less than 5MB", variant: "destructive" });
+                                                return;
+                                              }
+
+                                              const formData = new FormData();
+                                              formData.append("file", file);
+
+                                              const loadingToast = toast({ title: "Uploading...", description: "Please wait while we upload your resume." });
+
+                                              try {
+                                                const res = await fetch("/api/upload", {
+                                                  method: "POST",
+                                                  body: formData,
+                                                });
+
+                                                if (res.ok) {
+                                                  const data = await res.json();
+                                                  setApplicationData(prev => ({ ...prev, resume: data.url }));
+                                                  toast({ title: "Success", description: "Resume uploaded successfully" });
+                                                } else {
+                                                  throw new Error("Upload failed");
+                                                }
+                                              } catch (error) {
+                                                console.error("Upload error:", error);
+                                                toast({ title: "Error", description: "Failed to upload resume", variant: "destructive" });
+                                              }
+                                            }}
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full h-24 border-dashed flex flex-col gap-2"
+                                            onClick={() => document.getElementById("resume-upload")?.click()}
+                                          >
+                                            <Upload className="h-6 w-6" />
+                                            <span>Click to upload your resume (PDF, max 5MB)</span>
+                                          </Button>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
-                                  <div>
-                                    <DialogTitle>Contact {selectedJob.posted_by?.name}</DialogTitle>
-                                    <DialogDescription>{selectedJob.company}</DialogDescription>
+
+                                  {/* Cover Letter */}
+                                  <div className="space-y-2">
+                                    <Label>Cover Letter (Optional)</Label>
+                                    <Textarea
+                                      placeholder="Tell the employer why you're a great fit for this role..."
+                                      value={applicationData.coverLetter}
+                                      onChange={(e) => setApplicationData(prev => ({ ...prev, coverLetter: e.target.value }))}
+                                      className="h-32"
+                                    />
                                   </div>
+
+                                  {/* Submit Button */}
+                                  <Button
+                                    className="w-full"
+                                    size="lg"
+                                    disabled={!applicationData.resume || isApplying}
+                                    onClick={() => handleApplyJob(selectedJob._id)}
+                                  >
+                                    {isApplying ? (
+                                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting...</>
+                                    ) : (
+                                      'Submit Application'
+                                    )}
+                                  </Button>
                                 </div>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                {selectedJob.posted_by?.phone && (
-                                  <div className="space-y-2">
-                                    <Label>Phone Number</Label>
-                                    <div className="flex gap-2">
-                                      <div className="relative flex-1">
-                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input readOnly value={selectedJob.posted_by.phone} className="pl-9" />
-                                      </div>
-                                      <Button size="icon" variant="outline" onClick={() => {
-                                        navigator.clipboard.writeText(selectedJob.posted_by.phone!);
-                                        toast({ title: "Copied!", description: "Phone number copied to clipboard." });
-                                      }}>
-                                        <Copy className="h-4 w-4" />
-                                      </Button>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+
+                          {/* View Applications Button - for job poster */}
+                          {session?.user && selectedJob.posted_by?._id === userId && (
+                            <Dialog open={showApplicationsDialog} onOpenChange={setShowApplicationsDialog}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  className="flex-1"
+                                  size="lg"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    fetchApplications(selectedJob._id);
+                                    setShowApplicationsDialog(true);
+                                  }}
+                                >
+                                  <User className="h-4 w-4 mr-2" /> View Applications
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+                                <DialogHeader>
+                                  <DialogTitle>Applications for {selectedJob.title}</DialogTitle>
+                                  <DialogDescription>
+                                    {applications.length} application(s) received
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 mt-4">
+                                  {loadingApplications ? (
+                                    <div className="flex items-center justify-center py-8">
+                                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                                     </div>
-                                  </div>
-                                )}
-                                {selectedJob.posted_by?.email && (
-                                  <div className="space-y-2">
-                                    <Label>Email Address</Label>
-                                    <div className="flex gap-2">
-                                      <div className="relative flex-1">
-                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input readOnly value={selectedJob.posted_by.email} className="pl-9" />
-                                      </div>
-                                      <Button size="icon" variant="outline" onClick={() => {
-                                        navigator.clipboard.writeText(selectedJob.posted_by.email!);
-                                        toast({ title: "Copied!", description: "Email copied to clipboard." });
-                                      }}>
-                                        <Copy className="h-4 w-4" />
-                                      </Button>
+                                  ) : applications.length === 0 ? (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                      <User className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                                      <p>No applications yet</p>
                                     </div>
-                                  </div>
-                                )}
-                                {!selectedJob.posted_by?.phone && !selectedJob.posted_by?.email && (
-                                  <p className="text-center text-muted-foreground py-4">No contact details available.</p>
-                                )}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
+                                  ) : (
+                                    applications.map((app) => (
+                                      <div
+                                        key={app._id}
+                                        className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors"
+                                      >
+                                        {/* Applicant Avatar */}
+                                        <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center overflow-hidden shrink-0">
+                                          {app.applicant?.image ? (
+                                            <Image
+                                              src={app.applicant.image}
+                                              alt={app.applicant.name}
+                                              width={56}
+                                              height={56}
+                                              className="object-cover h-full w-full"
+                                            />
+                                          ) : (
+                                            <User className="h-6 w-6 text-muted-foreground" />
+                                          )}
+                                        </div>
+
+                                        {/* Applicant Info */}
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="font-semibold truncate">{app.applicant?.name || 'Unknown'}</h4>
+                                          <p className="text-sm text-muted-foreground truncate">
+                                            {app.applicant?.headline || app.applicant?.category || 'No headline'}
+                                          </p>
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <Badge
+                                              variant={app.status === 'pending' ? 'secondary' : app.status === 'shortlisted' ? 'default' : 'outline'}
+                                              className="text-xs"
+                                            >
+                                              {app.status}
+                                            </Badge>
+                                            <span className="text-xs text-muted-foreground">
+                                              Applied {new Date(app.createdAt).toLocaleDateString()}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="flex gap-2 shrink-0">
+                                          <Button variant="outline" size="sm" asChild>
+                                            <Link href={app.resume} target="_blank">
+                                              <FileText className="h-4 w-4 mr-1" /> Resume
+                                            </Link>
+                                          </Button>
+                                          <Button variant="outline" size="sm" asChild>
+                                            <Link href={`/profile/${app.applicant?._id}`} target="_blank">
+                                              <User className="h-4 w-4 mr-1" /> Profile
+                                            </Link>
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+
+                          {/* Show Apply button for non-logged in users */}
+                          {!session?.user && (
+                            <Button className="flex-1" size="lg" asChild>
+                              <Link href="/login">Login to Apply</Link>
+                            </Button>
+                          )}
+
                           <Button variant="outline" size="icon" className="h-11 w-11 shrink-0">
                             <Share2 className="h-5 w-5" />
                           </Button>

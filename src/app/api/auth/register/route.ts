@@ -17,12 +17,20 @@ export async function POST(req: Request) {
 
         await connectDB();
 
-        const existingUser = await UserModel.findOne({ email });
+        const existingUser = await UserModel.findOne({ $or: [{ email }, { phone }] });
         if (existingUser) {
-            return NextResponse.json(
-                { message: "User already exists with this email" },
-                { status: 409 }
-            );
+            if (existingUser.email === email) {
+                return NextResponse.json(
+                    { message: "User already exists with this email" },
+                    { status: 409 }
+                );
+            }
+            if (existingUser.phone === phone) {
+                return NextResponse.json(
+                    { message: "User already exists with this phone number" },
+                    { status: 409 }
+                );
+            }
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -35,7 +43,7 @@ export async function POST(req: Request) {
             phone,
             coa_number,
             auth_provider: 'email',
-            status: 'active', // or 'pending' if you require approval
+            status: category === 'Architect' ? 'pending' : 'active',
         });
 
         return NextResponse.json(
